@@ -4,23 +4,27 @@ For writing assembler on an intel Mac (2017 Macbook Air).
 
 ## Setup Instructions
 
-- Download [dosbox-x](xxx)
-- Create project directory. I call mine `mkdir asm/`
+- Download [dosbox-x](https://dosbox-x.com/)
+- Create project directory: `mkdir asm/`
 - Create dir to serve as `C:` drive within DosBox: `mkdir asm/c_drive`
-- Create a config file for DosBox: `touch asm/c_drive/dosbox-x.conf`
-- Put this in config. According to [this guide](xxx)
-- Decide if You want DPMI or not
-- Download a DPMI server like japhet's
+- Create a config file for DosBox: `touch asm/dosbox-x.conf`
+- If You want DPMI, download a server like japheth's [here](https://www.japheth.de/HX.html)
 
 The rest of the setup I have put in the conf file for convenience.
+I switched together the config based on tips found here:
+
+- [ Philip Bohun's Youtube asm guide ](https://www.youtube.com/watch?v=HcLA6F5UTIE&list=PLSiFUSQSRYANu14mkQADmVMYPcssk_IqP&index=1)
+- [ Hans-Joachim Rudolph's guide from the FASM forum ](https://board.flatassembler.net/topic.php?t=22910)
+- [ The official Dosbox-x wiki ](https://dosbox-x.com/wiki/#Home)
+- Other resources I'm almost certainly forgetting
 
 ## DosBox-X
 
-- Default config file with useful comments: "/Users/me/Library/Preferences/DOSBox-X 2025.02.01 Preferences"
+- (MacOS) Path to default config file with useful comments: "${HOME}/Library/Preferences/DOSBox-X 2025.02.01 Preferences"
 
 ## Keys
 
-- More complete references: /Users/me/dev/asm/fasmd-shortcuts.md
+- More info can be found in this repo in files with the `cheatsheet-` prefix
 
 ## IDE
 
