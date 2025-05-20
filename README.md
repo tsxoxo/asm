@@ -1,6 +1,8 @@
 # Stuff that was helpful
 
-For writing assembler on an intel Mac (2017 Macbook Air).
+For writing assembler on an intel Mac (2017 Macbook Air) using Dosbox-x and FASM.
+
+These information have been compiled/collected from various sources. Credits go to all the people who made the guides listed under `Resources`. Also, thanks Claude.
 
 ## Setup Instructions
 
@@ -10,7 +12,10 @@ For writing assembler on an intel Mac (2017 Macbook Air).
 - Create a config file for DosBox: `touch asm/dosbox-x.conf`
 - If You want DPMI, download a server like japheth's [here](https://www.japheth.de/HX.html)
 
-The rest of the setup I have put in the conf file for convenience.
+For the last step, copy the contents (or part of them) from the file `dosbox-x.conf` in this repo into your config.
+
+## Resources
+
 I stitched together the config based on tips found here:
 
 - [ Philip Bohun's Youtube asm guide ](https://www.youtube.com/watch?v=HcLA6F5UTIE&list=PLSiFUSQSRYANu14mkQADmVMYPcssk_IqP&index=1)
@@ -24,7 +29,7 @@ I stitched together the config based on tips found here:
 
 ## Keys
 
-- More info can be found in this repo in files with the `cheatsheet-` prefix
+- More info can be found in this repo in files with the `cheatsheet-` prefix (these are copied answers from Claude.ai)
 
 ## IDE
 
