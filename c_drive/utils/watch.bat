@@ -1,7 +1,7 @@
+@ECHO OFF
+
 REM Prog to make fasm compile/run cycle a little faster.
 REM Assumes you are waiting for keypress to exit in your program.
-
-@ECHO OFF
 
 :LOOP
   REM give us a chance to quit
