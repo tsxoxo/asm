@@ -14,6 +14,31 @@ These information have been compiled/collected from various sources. Credits go 
 
 For the last step, copy the contents (or part of them) from the file `dosbox-x.conf` in this repo into your config.
 
+### LSP
+
+- in NeoVim, "asm-lsp" does a decent job for me.
+
+NB: For some reason, this works better in files with CAPITALIZED extension `.ASM`
+
+### Compile cycle
+
+_Work in progress_
+
+- Edit in Neovim on native OS (outside of dosbox)
+- In `foo.asm`, set up exit on a keyboard input
+- In dosbox, run `watch foo`
+- After making an edit in nvim, switch to dosbox window and press a key
+- watcher tries to recompile `foo.asm` and run `foo.com`
+
+This is slightly easier than
+
+- ... switch to doxbox window
+- hit key to terminate program
+- `fasm foo.asm`
+- `foo.com`
+
+(You could of course run a build script by hand)
+
 ## Resources
 
 I stitched together the config based on tips found here:
@@ -37,10 +62,19 @@ _Keys for editing, debugging, compiling, etc._
 
 ### DEBUG
 
-- **t** - Trace (step execution)
-- **d hhhh:hhhh** - Show memory segment. E.g. `d b800:0000` can show the screen buffer in default graphics mode.
-- **p** - Show processor state
-- **q** - Quit
+- **t** - [t]race (step execution)
+- **g** - [g]o! Run program
+- **g 102** - Run program until instruction at offset 102 (i.e. IP === 102)
+- **d hhhh** - [d]ump memory at given offset using the default segment.
+- **p** - Show [p]rocessor state
+- **q** - [q]uit
+
+- **a 100** - start [a]ssembly mode at offset 100: enter instructions in human readable format. E.g. `mov ah,02`
+- **u 100** - [u]nassemble data starting from offset 100: show stored instructions in human readable format.
+- **d hhhh:hhhh** - dump memory at exact segment:offset. Example: `d b800:0000` can show the screen buffer in default graphics mode.
+- **r ax** - Create prompt to enter value and move it into [r]egister ax
+- **e 100** - Create prompt to [e]nter bytes, starting at offset 100. Leave empty and press enter to exit this mode.
+- **h 1 f** - compares two [h]ex numbers. Shows sum and difference. Limited to 2 bytes, rest will be cut. -1 = FFFFh.
 
 ### FASMD
 
@@ -66,7 +100,28 @@ Using the mouse didn't work for me so I set it up via keyboard:
 - Copy selection: `fn + shift + <right>`
 - Cancel: `esc`
 
+## ASM instructions
+
+**mov ax,<value>** - overwrites ax with value of register/constant/memory address
+**add <value>** - adds value to ax
+
+## DOS instructions
+
+- [ List 1, old ](https://www.ctyme.com/intr/int-21.htm)
+- [ List 2, wiki ](https://en.wikipedia.org/wiki/DOS_API#DOS_INT_21h_services)
+
+### Interrupts
+
+**20** - exit
+**21** - prints char. Set ah to 02h (specifies the function). Set DL to the ASCII code.
+
 ## ASCII art
+
+### Chars
+
+_ascii hex codes_
+
+**☻** - 02
 
 This is the BIOS Data Area (BDA) - a goldmine for ASCII art programming! It contains:
 

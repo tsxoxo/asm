@@ -1,0 +1,10 @@
+[default_config]
+assembler = "nasm"
+instruction_set = "x86/x86-64"
+
+[opts]
+# Keep the language server for hover docs and completions
+diagnostics = false
+default_diagnostics = false
+# Don't try to compile at all
+compiler = ""
