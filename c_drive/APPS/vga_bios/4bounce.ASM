@@ -15,12 +15,6 @@ mov ah, 0 ; func
 mov al, 13h ; arg: mode 13 -- 320x200, 256 colors
 int 10h
 
-; set up draw pixel
-mov ah, 0ch ; func to write pixel
-mov bh, 0 ; page 0
-; posX
-mov cx, 100
-
 main_loop:
   ; Calculate next positions in temp registers
   mov ax, [pos_x]
@@ -32,6 +26,7 @@ main_loop:
   ; check_x
   cmp ax, 0
   jl bounce_x
+  ; produces a flicker at x=0, not sure why
   cmp ax, 319
   jg bounce_x
   jmp check_y
