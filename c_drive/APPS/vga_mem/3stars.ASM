@@ -61,7 +61,6 @@ ret
 main:
   call setup
 
-
   ; Accessing array elements:
   mov cx,star_count
   ; array index
