@@ -1,15 +1,10 @@
-; stars animated in a static loop with palette shenanigans
-; NOTE: START HERE: * add palette shenanigans (fade in-fade out rotation)
-;                   * play with profilng/border trick discussed with claude in "Troubleshooting Missing Pixels in Assembly Drawing Routine"
+; background shenanigans 
 
 org 100h
 jmp main
 
 ; UTILS
 ; Performs modulo so we can use our "circular buffers"
-; NOTE: Write a get_next_random that adds OR decreases offset based on smth like system time -- see get_timer
-; (this would entail handling out of bounds cases)
-; could also add noise some other way, = <some pointer reg>%69 ?
 get_next:
 ; INPUT BL=offset
 ; OUTPUT BL = (offset+1) % star_count (modulo)
@@ -56,14 +51,49 @@ ret
 
 ; DRAWING
 ; clear screen by putting a lot of pixels into video buffer
-; doing it with 32000 and stosw produces less flicker than 64000 and stosb
+; first tests suggest this to be faster than 64000 x stosb
 clear_screen:
   xor di, di
+
   ; count for rep instruction
   mov cx, 32000
+
   ; if color = 0 this is faster
+  ; xor ax, ax
+  ;mov al, bg_color
   xor ax, ax
-  rep stosw
+
+; loop for creating patterns and bg animations
+freak:
+  ; be creative
+  mov ax, cx
+  add ax, di
+  xor ax, cx
+  shr ax, 7
+
+  ; static
+  ; and ax, 99
+  ; and ax, 17
+  ; and ax, 63      ; skewed squares
+  ; and ax, 3       ; broad, centered columns
+
+  ; animated
+  and ax, 256
+  ; and ax, 1023
+  ; and ax, 319
+  ; and ax, 320
+  ; and ax, 666
+
+  jp color2
+  mov ax, 18
+  jmp draw
+
+  color2:
+  xor ax, ax
+
+  draw:
+  stosw
+  loop freak
 ret
 
 draw_stars:
@@ -168,17 +198,6 @@ update:
   pop ax
 ret
 
-wait_retrace:
-mov dx,3DAh       ; Load VGA status port address into DX
-l1:               ; Label for first loop
-in al,dx          ; Read status byte from port 3DAh into AL
-and al,08h        ; Mask out all bits except bit 3, MODIFYING AL
-jnz l1            ; If result is non-zero (bit 3 was set), keep looping
-l2:               ; Label for second loop
-in al,dx          ; Read status byte again  
-and al,08h        ; Mask out all bits except bit 3 again
-jz l2             ; If result is zero (bit 3 was clear), keep looping
-ret
 
 ; MAIN
 main:
@@ -199,7 +218,6 @@ mov es, ax
 
 main_loop:
 ; call clear_each
-call wait_retrace
 call clear_screen
 call update
 call draw_stars
@@ -224,7 +242,7 @@ int 20h
 
 ; DATA
 og_video_mode db 0
-animation_speed = 5                         ; higher number == slower framerate           
+animation_speed = 1                         ; higher number == slower framerate           
 
 star_count = 5                          
 bg_color = 0
