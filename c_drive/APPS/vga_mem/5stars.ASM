@@ -42,18 +42,67 @@ wait_ticks:
 ret
 
 wait_for_frame:
-    ; push ax
-    ; push bx
-    ; push cx
-    ; push dx
+    push ax
+    push bx
+    push cx
+    push dx
     mov bx, animation_speed
     call wait_ticks
-    ; pop dx
-    ; pop cx
-    ; pop bx
-    ; pop ax
+    pop dx
+    pop cx
+    pop bx
+    pop ax
 ret
 
+; PALETTE
+set_pal:
+  mov al, 15
+  mov dx, 3C8h                          ; palette index port
+  out dx, al
+
+  inc dx
+  mov al, 9
+  out dx, al
+  mov al, 14
+  out dx, al
+  mov al, 28
+  out dx, al
+ret
+
+setup_fade_palette:
+    push ax
+    push bx
+    push cx
+    push dx
+    
+    mov cx, 16                  ; 16 brightness levels
+    mov bl, 0                   ; Starting brightness (0 = black)
+    mov si, 16                  ; Starting palette index
+    
+create_ramp:
+    ; Set palette index
+    mov dx, 3C8h                ; VGA palette index port
+    mov ax, si                  ; Palette index (16-31)
+    out dx, al
+    
+    ; Set RGB values (VGA uses 6-bit RGB: 0-63)
+    inc dx                      ; DX = 3C9h (palette data port)
+    mov al, bl                  ; Red component
+    out dx, al
+    mov al, bl                  ; Green component (same = white/gray)
+    out dx, al  
+    mov al, bl                  ; Blue component (same = white/gray)
+    out dx, al
+    
+    add bl, 4                   ; Next brightness level (0, 4, 8, 12, ..., 60)
+    inc si                      ; Next palette index
+    loop create_ramp
+    
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
 ; DRAWING
 ; clear screen by putting a lot of pixels into video buffer
 ; doing it with 32000 and stosw produces less flicker than 64000 and stosb
@@ -73,15 +122,15 @@ draw_stars:
   xor si, si
 
   draw_star:
-  ; AX=pos calculation, later AL = color
-  ; BX=320 constant
+  ; AX=pos calculation
+  ; BX=color
   ; CX=Counter based on size
   ; DX=star_size constant
 
     push cx
     xor ch, ch
 
-    ; start position
+    ; set DI to XY start position (upper left corner of square)
     xor ah, ah
     mov al, [star_y + si]     
     mov bx, ax
@@ -95,77 +144,59 @@ draw_stars:
     add ax, dx
     mov di, ax
 
+    ; save size for counting in CX and as a constant in DX
     mov cl, [star_sizes + si]
     mov dx, cx
 
   draw_row:
     push cx
-    push di
-    ; static color for now
-    mov al, 15
+
+    ; write a row = as many times as [star_sizes + si]
+    ; xor ah, ah
+    ; mov al, [color_table]
+    
+    ; animation
+    ; set base value
+    mov al, [color_table]
+
+    ; do stuff
+    ; opening doors
+    ; sub al, cl
+    ; shr al, 4
+
+    ; sort of staggered flickering
+    add al, dl
+    add ax, si
+
+    ; weird flickering patterns
+    ; xor ax, di
+    ; xor ax, 7
+
+    ; clamp and set range
+    and ax, 15
+    add ax, 16
+
     mov cx, dx
     rep stosb
 
     ; move to next row
-    pop di
+    sub di, dx
     add di, 320
 
     pop cx
     loop draw_row
 
+; repeat for every star
     pop cx
     inc si
     loop draw_star
 ret
 
 update:
-  push ax
-  push bx
-  push si
-
-  ; set up counters and registers
-  xor si, si
-  mov cx, star_count
-  xor bh, bh
-  xor ah, ah
-
-  update_loop:
-    ; pointer to star's current offset
-    mov bl, [offsets + si]
-
-    ; UPDATE POSITIONS
-    ; X = star_x + (x_offset * x_sign)
-    mov al, [star_x + si] 
-    cmp [x_sign + bx], 0
-    je subtract_x
-    add al, [x_offsets + bx]
-    jmp x_done
-    subtract_x:
-    sub al, [x_offsets + bx]
-    x_done:
-    mov [star_x + si], al
-
-    ; Y = star_y + (y_offset * y_sign)
-    mov al, [star_y + si] 
-    cmp [y_sign + bx], 0
-    je subtract_y
-    add al, [y_offsets + bx]
-    jmp y_done
-    subtract_y:
-    sub al, [y_offsets + bx]
-    y_done:
-    mov [star_y + si], al
-
-    ; UPDATE OFFSETS
-    call get_next
-    mov [offsets + si], bl
-
-    inc si
-  loop update_loop
-
-  pop si
-  pop bx
-  pop ax
+; time in dx
+    ; cycle through palette range 
+    add dl, 0Fh
+    mov [color_table], dl
 ret
 
 wait_retrace:
@@ -180,9 +211,9 @@ and al,08h        ; Mask out all bits except bit 3 again
 jz l2             ; If result is zero (bit 3 was clear), keep looping
 ret
 
+
 ; MAIN
 main:
-; SETUP
 ; get current videomode and store in al
 mov ah, 0fh
 int 10h
@@ -193,17 +224,38 @@ xor ah, ah
 mov al, 13h                           ; 320x200, 256 colors
 int 10h
 
+; call set_pal
+; call setup_fade_palette
+
 ; point es to video memory
 mov ax, 0A000h
 mov es, ax
 
 main_loop:
-; call clear_each
-call wait_retrace
-call clear_screen
-call update
+; call wait_retrace
+; call clear_screen
+
+xor ah, ah                          ; func = read system clock counter (ca. 18ticks per second)
+int 1Ah                             ; result in CX:DX
+
+and dl, 1fh                         ; clamp to 0-15
+
+; cycle through palette range 
+; Create triangle wave: 0-15-0-15-0...
+    cmp dl, 16
+    jl triangle_done
+    
+    ; If >= 16, reverse it: 31-16=15, 30-16=14, etc.
+    mov al, 31
+    sub al, dl
+    mov dl, al
+    
+triangle_done:
+    add dl, 16                      ; Shift to palette 16-31
+    mov [color_table], dl
+
 call draw_stars
-call wait_for_frame
+; call wait_for_frame
 
 ; Press any key to exit
 mov ah, 01h
@@ -229,15 +281,18 @@ animation_speed = 5                         ; higher number == slower framerate
 star_count = 5                          
 bg_color = 0
 
+; flag for oscillating animation
+reverse_flag db 0
+
 star_x db 50, 80, 120, 150, 200             ; DB: define bytes (8-bit values)
 star_y db 60, 40,  80, 100,  70           
-star_sizes db 10, 2, 7, 4, 5
+star_sizes db 10, 2, 7, 40, 5
 
 ; index to circular buffers
 offsets db 0, 1, 2, 3, 4
 
 ; circular buffers
-color_table db 68, 82, 72, 78, 64
+color_table db 0, 82, 72, 78, 64
 ; movement
 x_offsets db 0, 1, 1, 1, 1                  ; distance
 x_sign db 1, 1, 0, 0, 1                     ; direction 1=positive, 0=negative
