@@ -1,26 +1,13 @@
 ; stars animated in a static loop with palette shenanigans
-; NOTE: * play with profiling/border trick discussed with claude in "Troubleshooting Missing Pixels in Assembly Drawing Routine"
 
 org 100h	
 jmp main
 
+; #############################################################
 ; UTILS
-; Performs modulo so we can use our "circular buffers"
-; NOTE: Write a get_next_random that adds OR decreases offset based on smth like system time -- see get_timer
-; (this would entail handling out of bounds cases)
-; could also add noise some other way, = <some pointer reg>%69 ?
-get_next:
-; INPUT BL=offset
-; OUTPUT BL = (offset+1) % star_count (modulo)
-inc bl
-cmp bl, star_count
-je reset_to_zero
-ret
-reset_to_zero:
-xor bl, bl
-ret
-
-; TIMER
+; #############################################################
+; TIMING
+; use wait_for_frame to set animation speed
 get_timer:
 ; OUTPUT AX = Low order word of system tick count
     push dx
@@ -103,7 +90,9 @@ wait_retrace:
         ret
 
 
+; #############################################################
 main:		
+; #############################################################
         mov ah, 0fh		; get current videomode and store in al
         int 10h
         mov [og_video_mode], al
@@ -117,13 +106,20 @@ main:
         mov ax, 0A000h		; point es to video memory
         mov es, ax
 
+        xor bp, bp
+
 main_loop:
         ; call wait_retrace		; not sure if needed
 
         xor si, si                                              ; draw stars
 
+        xor ax, ax                                              ; get timer once per frame and save low word in CX
+        int 1Ah                             	; result in CX:DX
+
+        and dx, 15                                              ; only update every 16 frames
+        jz draw_star
+        mov bp, dx
 draw_star:
-        ; NOTE: use ah for storing y could save bytes
         xor ah, ah                                              ; set DI to XY start position (upper left corner of square)
         xor dh, dh                                              ; cannot assume DX === 0
         mov al, [star_y + si]                                   ; offset = Y * 320 + X     
@@ -133,17 +129,27 @@ draw_star:
         add ax, bx                                              ; 256 + 64 = 320
         mov dl, [star_x + si]
         add ax, dx
-        mov di, ax
+        mov di, ax                                              ; set pointer. AX can be discarded
 
         xor bh, bh
         mov bl, [star_sizes + si]                               ; store size for easy access
 
-                                                                ; set color
-        xor ax, ax                          	; read sys clock.
-        int 1Ah                             	; result in CX:DX
-        and dl, 15
-        add al, dl
-        mov dx, si
+        ; set color
+        mov ax, 31
+        xor bp, 411                                             ; mix BP (timer) with noise to produce oscillations
+        and bp, ax                                              ; Clamp to double the palette range 0-31 to produce a triangle wave
+        cmp bp, 16                                              ; test if it's "over the hump"
+        jl triangle_done                                        ; either draw one way
+
+        and bp, 15                                              ; or the other
+        sub ax, bp
+        jmp color_done
+
+triangle_done:
+        mov ax, bp
+
+color_done:
+        mov dx, si                                              ; base on index of star
         add ax, dx
 
         and al, 15                                              ; clamp and offset to get range 16-31 
@@ -170,20 +176,6 @@ next_star:
         cmp si, star_count
         jl draw_star
 
-        ;
-        ; ; Create triangle wave: 0-15-0-15-0...
-        ; cmp dl, 16		; cycle through palette range 
-        ; jl triangle_done
-        ;
-        ;
-        ; ; If >= 16, reverse it: 31-16=15, 30-16=14, etc.
-        ; mov al, 31
-        ; sub al, dl
-        ; mov dl, al
-        ;
-        ; triangle_done:
-        ; add dl, 16                      ; Shift to palette 16-31
-        ; mov [color_table], dl                                   
         call wait_for_frame
 
         mov ah, 01h                                             ; Press any key to exit
@@ -204,22 +196,11 @@ next_star:
 ; DATA
 ; #############################################################
 og_video_mode db 0
-animation_speed = 10                                             ; higher number == slower framerate           
+animation_speed = 12                                             ; higher number == slower framerate           
 
 star_count = 5                          
-bg_color = 0
 
-star_x db 10, 20, 30, 40, 50                                 ; DB: define bytes
+star_x db 10, 60, 80, 120, 240                                 ; DB: define bytes
 star_y db 60, 40,  80, 100,  70           
 star_sizes db 10, 2, 7, 40, 5
 
-offsets db 0, 1, 2, 3, 4                                        ; index to circular buffers
-
-; circular buffers
-color_table db 0, 82, 72, 78, 64
-
-x_offsets db 0, 1, 1, 1, 1                                      ; movement. offsets are distance
-x_sign db 1, 1, 0, 0, 1                                         ; direction 1=positive, 0=negative
-
-y_offsets db 1, 1, 0, 1, 1
-y_sign db 0, 1, 1, 0, 1
