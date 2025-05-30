@@ -2,9 +2,23 @@
 assembler = "nasm"
 instruction_set = "x86/x86-64"
 
-[opts]
-# Keep the language server for hover docs and completions
-diagnostics = false
-default_diagnostics = false
-# Don't try to compile at all
-compiler = ""
+[default_config.opts]
+# compiler = "/Users/me/dev/asm/fasm/source/macos/x64/fasmg"
+compiler = "fasmg"
+command = "fasmg"
+# compile_flags_txt = [
+#     "your",
+#     "arguments",
+#     "to",
+#     "nasm",
+#     "here",
+# ]
+diagnostics = true
+# default_diagnostcs = false
+
+# [opts]
+# # Enable diagnostics 
+# diagnostics = true
+# default_diagnostics = true
+# compiler = "/Users/me/dev/asm/fasm/source/macos/x64/fasmg"
+# # Set your compiler path
