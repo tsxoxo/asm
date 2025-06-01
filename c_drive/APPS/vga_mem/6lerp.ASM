@@ -120,7 +120,7 @@ draw_star:
 push ax
                 mov dl, [star_x + si]                           ; DL == X
                 mov dh, [star_y + si]                           ; DH == Y
-                mov bl, [star_sizes + si]                       ; BL == size
+                mov bl, [star_size_current + si]                ; BL == size
 
                 xor bh, bh
                 xor ch, ch                                      ; is this necessary?
@@ -137,7 +137,7 @@ push ax
                 mov di, ax                                      ; set pointer to star position. AX can be discarded
 
                 pop ax                                          ; restore color                  
-                mov cl, bl                                      ; row counter. based on star_sizes + si
+                mov cl, bl                                      ; row counter. based on star_size + si
 draw_row:
                 mov ch, bl                                      ; col counter.
 draw_col:
@@ -153,40 +153,147 @@ draw_col:
                 jmp draw_row 
 done:
                 ret
+update_size:
+; Assume SI == index of star
 
-; #############################################################
-main:		
-; #############################################################
-; SETUP
-                mov ah, 0fh	; get current videomode and store in al
-                int 10h
-                mov [og_video_mode], al
+push ax
+push bx
+push cx
+push dx
+                mov cl, [star_x + si]
+                mov ch, [star_y + si]
+                mov bl, [target_x]
+                mov bh, [target_y]
+                ; assume CL = UNSIGNED current X, CH = UNSIGNED current Y 
+                ; assume BL = UNSIGNED target X, BH = UNSIGNED target Y (160, 100)
+                ; calculate SIGNED deltas: target - current
 
-                xor ah, ah	; set video mode 13
-                mov al, 13h                           	; 320x200, 256 colors
-                int 10h
+                ; calculate SIGNED delta X
+                mov al, bl                                      ; extend target to AX 16-bit to do a signed calculation. 
+                xor ah, ah
+                mov dl, cl                                      ; extend current to DX
+                xor dh, dh
+                sub ax, dx                                      ; AX = SIGNED delta X, range -160 to 160 
 
-                call setup_fade_palette	; set up custom palette
+                ; convert delta X to UNSIGNED absolute value
+                cwd                                             ; sign extend AX to DX:AX
+                xor ax, dx                                      ; flips to ~AX only if result negative (DX == FFFF == -1) 
+                sub ax, dx                                      ; subtract 0 or -1. AX == UNSIGNED absolute delta X
 
-                xor ah, ah                                      ; initialize random seed based on timer
-                int 1Ah                                         ; result in CX:DX
-                mov [rng_seed], dx
+                mov [ distance_x_absolute ], al                 ; store
 
-                mov ax, 0A000h                                  ; point es to video memory
-                mov es, ax
+                ; calculate SIGNED delta Y
+                mov al, bh                                      ; extend target Y to AX 16-bit to do a signed calculation
+                xor ah, ah
+                mov dl, ch                                      ; extend current Y to DX
+                xor dh, dh
+                sub ax, dx                                      ; AX = SIGNED absolute delta Y
 
-main_loop:
-                ; call wait_retrace	; not sure if needed
-                xor si, si
-loop_stars:
-                mov al, 16                                      ; erase stars
-                call draw_star
+                ; convert delta Y to UNSIGNED absolute value
+                cwd                                             ; sign extend AX to DX:AX
+                xor ax, dx                                      ; flips to ~AX only if result negative (DX == FFFF == -1) 
+                sub ax, dx                                      ; subtract 0 or -1. AX == UNSIGNED absolute delta Y
+
+                mov bl, [distance_x_absolute]
+                xor bh, bh
+
+                cmp ax, bx                                      ; lerp based on bigger delta
+                jl put_bigger_into_ax
+                jmp lerp_size
+
+                put_bigger_into_ax:
+                xchg ax, bx
+
+                lerp_size:
+                ; Assume AX = UNSIGNED distance, range 0 - 160
+
+                ; Use 4 size tiers based on distance:
+                ; 160 to 128 = original size
+                ; 128 to 64  = size / 2
+                ; 64 to 32   = size / 4
+                ; 32 to 8    = 1 pixel
+                ; < 8        = reset to original size
+                ; (not really a LERP, but who cares)
+
+                mov bl, [star_size_init + si]                   ; BX = star size
+                xor bh, bh
+
+                cmp ax, 128                                     ; AX = UNSIGNED distance, range 0 - 160
+                jg set_size                                     ; TIER 0 -> don't change size
+
+                cmp ax, 64                                      ; TIER 1 -> size / 2 (use bitshift)
+                jg tier_1
+
+                cmp ax, 32                                      ; TIER 2 -> size / 4 (use bitshift)
+                jg tier_2
+
+                cmp ax, 8
+                jg tier_3                                       ; TIER 3 -> 1 pixel
+
+                jmp tier_4                                      ; TIER 4 -> Reset to original size
+
+                tier_0:
+                jmp set_size
+
+                tier_1:
+                shr bl, 1
+                jmp set_size
+
+                tier_2:
+                shr bl, 2
+                jmp set_size
+
+                tier_3:
+                mov bl, 1
+                jmp set_size
+
+                tier_4:
+                mov bl, [star_size_init + si]                
+
+                set_size:
+                ; cmp bl, 1
+                ; jl clamp_to_1
+                ; jmp write_to_mem
+                ;
+                ; clamp_to_1:
+                ; mov bl, 1
+                ; instead, be clever:
+                or bl, 1                                        ; clamp to 1
+
+; write_to_mem:
+                mov [star_size_current + si], bl
+
+                pop dx
+                pop cx
+                pop bx
+                pop ax
+                ret
+
+update_star:
+; Assume SI == index of star
+; Get X, Y of star (SI)
+; calculate distance (X, Y, targetX, targetY) -> color, size
+; calculate SIGNED dX, dY (targetX, targetY) -> position
+
+; update size (distance)
+call update_size
+
+; update color (distance)
+; TODO: START HERE
+; * refactor color and pos lerping. use results from calc done in update_size
+; * update_size: extract calculations into procedures
+; * improve spawning algo: simply spawn in initial pos? distribute spawn points more towards edges of screen?
+; * possibly remove or simplify randomness: use init pos + an offset as new spawn?
+; * lerp position based on size, giving a delayed/gravity effect
+; * delay spawn of new stars: fade them in
+; 
+; update position (SIGNED dX, dY)
 
 update_positions:
 ; "Respawn" star after it disappears
 ; is star close to the center?
                 cmp [star_distance_sum + si], 16
-                ja not_close
+                ja lerp_towards_center
 
 reset_star:
                 ; X coordinate
@@ -203,9 +310,8 @@ reset_star:
                 div bx              ; DX = remainder (0-199)
                 mov [star_y + si], dl
 
-not_close:
-; LERP towards center (160, 100)
-; TODO: base on size
+lerp_towards_center:
+; 160, 100
                 mov dl, [star_x + si]                           ; DL == X
                 mov dh, [star_y + si]                           ; DH == Y
 
@@ -232,16 +338,8 @@ not_close:
 
 ; update color
                 ; Lerp this so that star 'fade away' as they move towards center
-                ; new color = color - 16 * alpha
-                ; alpha = 1/distance 
-                ; we round distance to nearest power of 2
                 ; ! Assume CL == X signed distance, CH == Y signed distance
 
-; TODO: START HERE
-; * extract draw_star to own func. Input: color, SI
-; * make stars get smaller the closer to the center they are
-; * improve LERP: they don't quite hit the center and they dont fade to black as a result I think
-; * seed new stars, as old ones disappear...
                 cmp cl, 0
                 jl invert_x
                 jmp check_if_y_negative
@@ -285,16 +383,37 @@ disappear:
 
 set_color:
                 mov [star_colors + si], dl
+ret
 
-; update size based on distance (x+y), which max 260
-; max distance 
-; distance   |   size
-;     < 8    |   0
-;     < 128  |   4
-;     > 128  |   bigger
-; size = seed + distance / 32
-; shr bx, 5
-; mov [star_sizes + si], bl
+; #############################################################
+main:		
+; #############################################################
+; SETUP
+                mov ah, 0fh	; get current videomode and store in al
+                int 10h
+                mov [og_video_mode], al
+
+                xor ah, ah	; set video mode 13
+                mov al, 13h                           	; 320x200, 256 colors
+                int 10h
+
+                call setup_fade_palette	; set up custom palette
+
+                xor ah, ah                                      ; initialize random seed based on timer
+                int 1Ah                                         ; result in CX:DX
+                mov [rng_seed], dx
+
+                mov ax, 0A000h                                  ; point es to video memory
+                mov es, ax
+
+main_loop:
+                ; call wait_retrace	; not sure if needed
+                xor si, si
+loop_stars:
+                mov al, 16                                      ; erase stars
+                call draw_star
+
+                call update_star
 
                 mov al, [star_colors + si]
                 call draw_star
@@ -326,11 +445,16 @@ set_color:
 og_video_mode db 0
 animation_speed = 1                                            ; higher number == slower framerate           
 
-star_count = 9                          
-star_x db 10, 60, 80, 120, 240, 74, 86, 92, 100                                  ; DB: define bytes
-star_y db 60, 40, 80, 90,  70, 23, 45, 99, 120, 203           
+target_x db 160
+target_y db 100
+
+star_count = 16
+star_x db 23, 189, 67, 241, 134, 45, 212, 98, 156, 12, 234, 78, 167, 201, 89, 145
+star_y db 23, 145, 89, 178, 56, 12, 190, 67, 134, 101, 45, 156, 34, 89, 167, 123
+star_size_init db 2, 5, 1, 3, 4, 2, 6, 1, 3, 5, 2, 4, 7, 1, 3, 8
+star_size_current db 2, 5, 1, 3, 4, 2, 6, 1, 3, 5, 2, 4, 7, 1, 3, 8
 star_distance_sum db 255, 255, 255, 255, 255, 255, 255, 255, 255
-star_sizes db 4, 2, 3, 4, 5, 2, 1, 3, 4
+distance_x_absolute db 8, 5, 1, 3, 4, 2, 6, 1, 3, 5, 2, 4, 7, 1, 3, 8
 star_colors db 31, 31, 31, 31, 31, 31, 31, 31, 31
 
 rng_seed dw 0x1234  ; 16-bit seed, any non-zero value
