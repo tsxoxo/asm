@@ -96,6 +96,7 @@ l2:
 
 
 put_pixel:                                                      ; IN: AL == color, BX == X, CX == Y
+                                                                ; DEBUG: dont draw if coordinates too high
                 cmp   bx, 320
                 jae   skip_pixel
                 cmp   cx, 200
@@ -105,8 +106,8 @@ put_pixel:                                                      ; IN: AL == colo
                 shl dx, 8                                       ; Y * 256
                 shl cx, 6                                       ; Y * 64
                 add cx, dx                                      ; CX = 256 + 64 = 320 * Y
-                add cx, bx                                      ; AX = 320 * Y + X
-                mov di, cx                                      ; set pointer to star position. AX can be discarded
+                add cx, bx                                      ; CX = 320 * Y + X
+                mov di, cx                                      ; set pointer to star position
 
                 stosb                                           ; write AL to [ES:DI] and increase DI
                 skip_pixel:
@@ -147,22 +148,48 @@ ret
 ; IN: DX == echo index, range 0-63
 ; OUT: BX == "random" X based purely on star index
 get_spawn_x:
-                mov bx, dx
-                xor bx, 317                                     ; some constant. 317 == skewed grid
-                ; xor bx, 293                                   ; alternative constant: sparse, sem-regular pairs
-                rol bx, 3
-                xor bh, bl
-                and bx, 0FFh                                    ; clip to 0-255
+push cx
+push dx
+                mov bx, dx                                      ; scramble to range 0-63
+                shl bx, 2
+                and bx, 63
+                mov ax, dx
+                xor ax, bx
+
+                mov dx, 319                                     ; scale to 0-319
+                mul dx                                         ; result in DX:AX
+                mov cx, 6
+                mul32shr6:
+                shr dx, 1
+                rcr ax, 1
+                loop mul32shr6
+                mov bx, ax
+                ; mov bx, 160
+pop dx
+pop cx
                 ret
 
 ; Calculate spawn position based on star index
 ; IN: DX == echo index
 ; OUT: CX == "random" Y based purely on star index
 get_spawn_y:  
+push dx
                 mov cx, dx
-                xor cl, 251                                     ; different constant
-                rol cx, 5  
-                and cx, 0FFh
+                shl cx, 5
+                and cx, 63
+                mov ax, dx
+                xor ax, cx
+
+                mov dx, 199                                     ; scale to 0-199
+                mul dx                                         ; result in DX:AX
+                mov cx, 6
+                mul32shr6y:
+                shr dx, 1
+                rcr ax, 1
+                loop mul32shr6y
+                mov cx, ax
+                ; mov cx, 100
+pop dx
                 ret
 
 ; Calculate new XY based on spawnXY and progress value as well as distance to targetXY
@@ -197,17 +224,10 @@ main_loop:
 
                 ; loop through 8 base stars
                 xor si, si
-core_erase_loop:                                                      
+core_loop:                                                      
 
                 mov bp, 0                                       ; draw the same star 8 times in different progress phase
 echo_erase_loop:
-                ; position = f(spawnPos, target, progress)
-                ; color = f(progress)
-                ;
-                ; spawnPos = f(virtual SI (0-63))
-                ; target = (160, 100)
-                ; progress = VALUE_IN_MEM
-
                                                                 ; Calculate virtual index
                 mov dx, si                                      ; DX == 0-7
                 shl dx, 3                                       ; DX == DX * 8 == 0-56
@@ -218,71 +238,39 @@ echo_erase_loop:
                 call get_spawn_y                                ; CX == spawn Y
 
                                                                 ; Calculate echo's progress
-	; echo_progress = [core_progress + si] + (bp * 32)
-                xor dh, dh
-                mov dl, [core_progress + si]
-                mov ax, bp                                      ; AX = echo number 0-7
-                shl ax, 5                                       ; AX = AX  * 32 = range(0-224)
-                add dx, ax                                      ; DX = echo_progress
-                cmp dx, 255
-                jbe progress_ok_erase
-                mov dx, 255         ; Cap at 255
-                progress_ok_erase:
+	; echo_progress = [core_progress + si] + f(bp)
+                ; xor dh, dh
+                ; mov dl, [core_progress + si]
+                ; mov ax, bp                                      ; AX = echo number 0-7
+                ; shl ax, 2                                       ; Transpose echo number
+                ; add dx, ax                                      ; DX = f(echo_ind) + core_progress = echo_progress
+                ; cmp dx, 255
+                ; jbe progress_ok_erase
+                ; mov dx, 0                                       ; Reset progress
+                ; progress_ok_erase:
 
                 ; lerp X and store into BX
                 ; X = spawnX + ((targetX - spawnX) * echo_progress) >> 8
-                xor ah, ah
-mov al, [target_x]
-cmp al, bl          ; Compare target to spawn
-ja target_greater_x_e ; Jump if target > spawn
+                ; xor ah, ah
+                ; mov al, [target_x]
+                ; sub ax, bx                                      ; AX == distanceX. range -95 - 160
+                ; mul dx                                          ; progress * delta
+                ; sar ax, 8
+                ; mov bx, ax
 
-; Target <= spawn (moving left)
-sub bl, al          ; BL = spawn - target (positive!)
-mul dl              ; progress * delta
-mov al, ah          ; Shift result
-sub bl, al          ; spawn - adjustment
-jmp done_x_e
-
-target_greater_x_e:
-; Target > spawn (moving right)  
-sub al, bl          ; AL = target - spawn (positive!)
-mul dl              ; progress * delta
-mov al, ah          ; Shift result
-add bl, al          ; spawn + adjustment
-
-done_x_e:
                 ; Y -> CX
-                xor ah, ah
-mov al, [target_y]
-cmp al, cl          ; Compare target to spawn
-ja target_greater_y_e ; Jump if target > spawn
 
-; Target <= spawn (moving left)
-sub cl, al          ; BL = spawn - target (positive!)
-mul dl              ; progress * delta
-mov al, ah          ; Shift result
-sub cl, al          ; spawn - adjustment
-jmp done_y_e
+                ; DEBUG
+                ; cmp bx, 320
+                ; jb x_ok_e
+                ; mov bx, 160     ; Force to center
+                ; x_ok_e:
+                ; cmp cx, 200
+                ; jb y_ok_e  
+                ; mov cx, 100     ; Force to center
+                ; y_ok_e:
 
-target_greater_y_e:
-; Target > spawn (moving right)  
-sub al, cl          ; AL = target - spawn (positive!)
-mul dl              ; progress * delta
-mov al, ah          ; Shift result
-add cl, al          ; spawn + adjustment
-
-done_y_e:
-
-                cmp bx, 320
-                jb x_ok_e
-                mov bx, 160     ; Force to center
-                x_ok_e:
-                cmp cx, 200
-                jb y_ok_e  
-                mov cx, 100     ; Force to center
-                y_ok_e:
-
-                mov al, 16                                      ; erase == draw black pixel at (BX, CX)
+                mov al, 31                                      ; erase == draw black pixel at (BX, CX)
                 call put_pixel
 
                 inc bp
@@ -291,117 +279,21 @@ done_y_e:
 
                 mov dl, [core_progress + si]                    ; update core progress
                 inc dl
-
 	; progress = 255 == respawn star == reset progress 0
                 cmp dl, 255                                     ; not sure if i need this -- overflow should take care of %255 right?
                 jl dont_reset
                 mov dl, 0
                 dont_reset:
-
                 mov [core_progress + si], dl
 
-                inc si
-                cmp si, 8
-                jl core_erase_loop
-
-
-                ; draw loop through 8 core stars
-                xor si, si
-core_draw_loop:                                                      
-
-                mov bp, 0                                       ; draw the same star 8 times in different progress phase
-echo_draw_loop:
-                ; position = f(spawnPos, target, progress)
-                ; color = f(progress)
-                ;
-                ; spawnPos = f(virtual SI (0-63))
-                ; target = (160, 100)
-                ; progress = VALUE_IN_MEM
-                                                                ; Calculate virtual index
-                mov dx, si                                      ; DX == 0-7
-                shl dx, 3                                       ; DX == DX * 8 == 0-56
-                add dx, bp                                      ; DX == 0-63
-
-                                                                ; Get spawnXY based on virtual index in DX
-                call get_spawn_x                                ; BX == spawn X
-                call get_spawn_y                                ; CX == spawn Y
-
-                                                                ; Calculate echo's progress
-	; echo_progress = [core_progress + si] + (bp * 32)
-                xor dh, dh
-                mov dl, [core_progress + si]
-                mov ax, bp                                      ; AX = echo number 0-7
-                shl ax, 5                                       ; AX = AX  * 32 = range(0-224)
-                add dx, ax                                      ; DX = echo_progress
-                cmp dx, 255
-                jbe progress_ok_draw
-                mov dx, 255         ; Cap at 255
-                progress_ok_draw:
-
-                ; lerp X and store into BX
-                ; X = spawnX + ((targetX - spawnX) * echo_progress) >> 8
-                xor ah, ah
-mov al, [target_x]
-cmp al, bl          ; Compare target to spawn
-ja target_greater_x ; Jump if target > spawn
-
-; Target <= spawn (moving left)
-sub bl, al          ; BL = spawn - target (positive!)
-mul dl              ; progress * delta
-mov al, ah          ; Shift result
-sub bl, al          ; spawn - adjustment
-jmp done_x
-
-target_greater_x:
-; Target > spawn (moving right)  
-sub al, bl          ; AL = target - spawn (positive!)
-mul dl              ; progress * delta
-mov al, ah          ; Shift result
-add bl, al          ; spawn + adjustment
-
-done_x:
-                ; Y -> CX
-                xor ah, ah
-mov al, [target_y]
-cmp al, cl          ; Compare target to spawn
-ja target_greater_y ; Jump if target > spawn
-
-; Target <= spawn (moving left)
-sub cl, al          ; BL = spawn - target (positive!)
-mul dl              ; progress * delta
-mov al, ah          ; Shift result
-sub cl, al          ; spawn - adjustment
-jmp done_y
-
-target_greater_y:
-; Target > spawn (moving right)  
-sub al, cl          ; AL = target - spawn (positive!)
-mul dl              ; progress * delta
-mov al, ah          ; Shift result
-add cl, al          ; spawn + adjustment
-
-done_y:
-                
-                cmp bx, 320
-                jb x_ok
-                mov bx, 160     ; Force to center
-                x_ok:
-                cmp cx, 200
-                jb y_ok  
-                mov cx, 100     ; Force to center
-                y_ok:
-
-                mov al, 31                                      ; draw == draw white pixel at (BX, CX)
-                call put_pixel
-
-                inc bp
-                cmp bp, 8
-                jl echo_draw_loop
+                ; NOTE: try adding the draw loop here
 
                 inc si
                 cmp si, 8
-                jl core_draw_loop
+                jl core_loop
 
+
+                ; ----------------------------- AFTER DRAWING -----------------------------
                 call wait_for_frame                             ; Chase beam and check if key pressed
 
                 mov ah, 01h                                     ; Press any key to exit
