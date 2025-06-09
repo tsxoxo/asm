@@ -1,4 +1,6 @@
 ; Sizecoding animation based on 6Lerp.asm
+; START_HERE:
+; * lerp position based on size, giving a delayed/gravity effect
 
 org 100h	
 jmp main
@@ -156,13 +158,22 @@ mul32shr6:
                 loop bitshift
                 ret
 
+; IN:   AX == distance, SIGNED
+;       DX == echo_progress
+; OUT:  AX == (distance * echo_progress) >> 8
 mul32shr8:
+                push cx
+                push dx
+
                 imul dx
                 mov cx, 8
                 bitshift8:
                 sar dx, 1
                 rcr ax, 1
                 loop bitshift8
+
+                pop dx
+                pop cx
                 ret
 ; -----------------------------------------------
 ; Calculate spawn position by mangling star index
@@ -172,6 +183,7 @@ mul32shr8:
 ;      CX == Y
 get_spawn_xy:
                 push si
+
                 mov si, dx
 
                 ; --- X ---
@@ -197,13 +209,42 @@ get_spawn_xy:
                 mov cx, ax
 
                 pop si
-
                 ret
 
 ; Calculate new XY based on spawnXY and progress value as well as distance to targetXY
-; IN: DX == echo's progress (0-63), BP == echo's index (0-7)
+; IN: si == echo's progress (0-63), BP == echo's index (0-7)
 ; OUT: BX = X, CX = Y
 calc_position:
+                                                                ; Calculate virtual index
+                mov dx, si                                      ; DX == 0-7
+                shl dx, 3                                       ; DX == DX * 8 == 0-56
+                add dx, bp                                      ; DX == 0-63
+
+                                                                ; Get spawnXY based on virtual index in DX
+                call get_spawn_xy                               ; BX == spawnX, CX == spawnY
+
+                                                                ; Calculate echo's progress
+	; echo_progress = [core_progress + si] + f(bp)
+                xor dh, dh
+                mov dl, [core_progress + si]
+                mov ax, bp                                      ; AX = echo number 0-7
+                shl al, 5                                       ; Transpose echo number
+                add dl, al                                      ; DX = f(echo_ind) + core_progress = echo_progress
+
+                ; lerp X and store into BX
+                ; X = spawnX + ((targetX - spawnX) * echo_progress) >> 8
+                xor ah, ah
+                mov al, [target_x]
+                sub ax, bx                                      ; AX == distanceX. range -95 - 160
+                call mul32shr8
+                add bx, ax
+
+                ; Y -> CX
+                xor ah, ah
+                mov al, [target_y]
+                sub ax, cx                                      ; AX == distanceX. range -95 - 160
+                call mul32shr8
+                add cx, ax
                 ret
 
 ; #############################################################
@@ -224,83 +265,51 @@ main:
                 mov es, ax
 
 main_loop:
-; TODO: START HERE
-; * write basic position lerp
-; * lerp position based on size, giving a delayed/gravity effect
-
                 ; call wait_retrace	; not sure if needed
 
                 ; loop through 8 base stars
                 xor si, si
 core_loop:                                                      
 
+                ; --- ERASE ---
                 mov bp, 0                                       ; draw the same star 8 times in different progress phase
 echo_erase_loop:
-                                                                ; Calculate virtual index
-                mov dx, si                                      ; DX == 0-7
-                shl dx, 3                                       ; DX == DX * 8 == 0-56
-                add dx, bp                                      ; DX == 0-63
+                call calc_position
 
-                                                                ; Get spawnXY based on virtual index in DX
-                call get_spawn_xy                               ; BX == spawnX, CX == spawnY
+                mov al, 16                                      ; erase == draw black pixel at (BX, CX)
+                call put_pixel
 
-                                                                ; Calculate echo's progress
-	; echo_progress = [core_progress + si] + f(bp)
-                xor dh, dh
-                mov dl, [core_progress + si]
-                mov ax, bp                                      ; AX = echo number 0-7
-                shl ax, 2                                       ; Transpose echo number
-                add dx, ax                                      ; DX = f(echo_ind) + core_progress = echo_progress
-                ; cmp dx, 255
-                ; jbe progress_ok_erase
-                ; mov dx, 0                                       ; Reset progress
-                ; progress_ok_erase:
+                inc bp
+                cmp bp, star_count
 
-                ; lerp X and store into BX
-                ; X = spawnX + ((targetX - spawnX) * echo_progress) >> 8
-                xor ah, ah
-                mov al, [target_x]
-                sub ax, bx                                      ; AX == distanceX. range -95 - 160
-                call mul32shr8
-                add bx, ax
+                jl echo_erase_loop
 
-                ; Y -> CX
+                ; --- UPDATE ---
+	; progress = 255 == respawn star == reset progress 0
+                mov dl, [core_progress + si]                    ; update core progress
+                ; inc dl
+                add dl, 3
+                mov [core_progress + si], dl
 
-                ; DEBUG
-                ; cmp bx, 320
-                ; jb x_ok_e
-                ; mov bx, 160     ; Force to center
-                ; x_ok_e:
-                ; cmp cx, 200
-                ; jb y_ok_e  
-                ; mov cx, 100     ; Force to center
-                ; y_ok_e:
+                ; --- DRAW ---
+                mov bp, 0                                       ; draw the same star 8 times in different progress phase
+echo_draw_loop:
+                call calc_position
 
                 mov al, 31                                      ; erase == draw black pixel at (BX, CX)
                 call put_pixel
 
                 inc bp
-                cmp bp, 8
-                jl echo_erase_loop
+                cmp bp, star_count
 
-                mov dl, [core_progress + si]                    ; update core progress
-                inc dl
-	; progress = 255 == respawn star == reset progress 0
-                cmp dl, 255                                     ; not sure if i need this -- overflow should take care of %255 right?
-                jl dont_reset
-                mov dl, 0
-                dont_reset:
-                mov [core_progress + si], dl
-
-                ; NOTE: try adding the draw loop here
+                jl echo_draw_loop
 
                 inc si
-                cmp si, 8
+                cmp si, star_count
                 jl core_loop
 
-
                 ; ----------------------------- AFTER DRAWING -----------------------------
-                call wait_for_frame                             ; Chase beam and check if key pressed
+                ; call wait_for_frame                             ; Chase beam and check if key pressed
 
                 mov ah, 01h                                     ; Press any key to exit
                 int 16h
@@ -320,7 +329,8 @@ echo_erase_loop:
 ; DATA
 ; #############################################################
 og_video_mode db 0
-animation_speed = 3                                            ; higher number == slower framerate           
+animation_speed = 1                                            ; higher number == slower framerate           
+star_count = 8
 
 black_hole_radius = 4
 
@@ -328,4 +338,4 @@ target_x db 160
 target_y db 100
 
 ; seeds
-core_progress db 0, 32, 64, 96, 128, 160, 192, 224
+core_progress db 90, 32, 64, 96, 128, 160, 192, 224
