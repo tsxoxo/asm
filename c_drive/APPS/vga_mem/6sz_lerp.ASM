@@ -144,52 +144,60 @@ update_color:
                 ; stars 'fade away' as they move towards center
 ret
 
+; do a 32 bit mult and then scale down by 64
+; IN: AX, DX as operands
+; OUT: AX -- scaled down result
+mul32shr6:
+                mul dx                                         ; result in DX:AX
+                mov cx, 6
+                bitshift:
+                shr dx, 1
+                rcr ax, 1
+                loop bitshift
+                ret
+
+mul32shr8:
+                imul dx
+                mov cx, 8
+                bitshift8:
+                sar dx, 1
+                rcr ax, 1
+                loop bitshift8
+                ret
+; -----------------------------------------------
 ; Calculate spawn position by mangling star index
-; IN: DX == echo index, range 0-63
-; OUT: BX == "random" X based purely on star index
-get_spawn_x:
-push cx
-push dx
-                mov bx, dx                                      ; scramble to range 0-63
-                shl bx, 2
-                and bx, 63
+; -----------------------------------------------
+; IN:  DX == echo index (0-63)
+; OUT: BX == X, 
+;      CX == Y
+get_spawn_xy:
+                push si
+                mov si, dx
+
+                ; --- X ---
+                mov bx, dx                                      ; scramble range 0-63
+                shl bx, 2                                       ; algo is called 'XOR fold'
+                and bx, 63                                      ; x = x XOR (x*n)
                 mov ax, dx
                 xor ax, bx
 
                 mov dx, 319                                     ; scale to 0-319
-                mul dx                                         ; result in DX:AX
-                mov cx, 6
-                mul32shr6:
-                shr dx, 1
-                rcr ax, 1
-                loop mul32shr6
+                call mul32shr6
                 mov bx, ax
-                ; mov bx, 160
-pop dx
-pop cx
-                ret
 
-; Calculate spawn position based on star index
-; IN: DX == echo index
-; OUT: CX == "random" Y based purely on star index
-get_spawn_y:  
-push dx
-                mov cx, dx
+                ; --- Y ---
+                mov cx, si
                 shl cx, 5
                 and cx, 63
-                mov ax, dx
+                mov ax, si
                 xor ax, cx
 
                 mov dx, 199                                     ; scale to 0-199
-                mul dx                                         ; result in DX:AX
-                mov cx, 6
-                mul32shr6y:
-                shr dx, 1
-                rcr ax, 1
-                loop mul32shr6y
+                call mul32shr6
                 mov cx, ax
-                ; mov cx, 100
-pop dx
+
+                pop si
+
                 ret
 
 ; Calculate new XY based on spawnXY and progress value as well as distance to targetXY
@@ -234,16 +242,15 @@ echo_erase_loop:
                 add dx, bp                                      ; DX == 0-63
 
                                                                 ; Get spawnXY based on virtual index in DX
-                call get_spawn_x                                ; BX == spawn X
-                call get_spawn_y                                ; CX == spawn Y
+                call get_spawn_xy                               ; BX == spawnX, CX == spawnY
 
                                                                 ; Calculate echo's progress
 	; echo_progress = [core_progress + si] + f(bp)
-                ; xor dh, dh
-                ; mov dl, [core_progress + si]
-                ; mov ax, bp                                      ; AX = echo number 0-7
-                ; shl ax, 2                                       ; Transpose echo number
-                ; add dx, ax                                      ; DX = f(echo_ind) + core_progress = echo_progress
+                xor dh, dh
+                mov dl, [core_progress + si]
+                mov ax, bp                                      ; AX = echo number 0-7
+                shl ax, 2                                       ; Transpose echo number
+                add dx, ax                                      ; DX = f(echo_ind) + core_progress = echo_progress
                 ; cmp dx, 255
                 ; jbe progress_ok_erase
                 ; mov dx, 0                                       ; Reset progress
@@ -251,12 +258,11 @@ echo_erase_loop:
 
                 ; lerp X and store into BX
                 ; X = spawnX + ((targetX - spawnX) * echo_progress) >> 8
-                ; xor ah, ah
-                ; mov al, [target_x]
-                ; sub ax, bx                                      ; AX == distanceX. range -95 - 160
-                ; mul dx                                          ; progress * delta
-                ; sar ax, 8
-                ; mov bx, ax
+                xor ah, ah
+                mov al, [target_x]
+                sub ax, bx                                      ; AX == distanceX. range -95 - 160
+                call mul32shr8
+                add bx, ax
 
                 ; Y -> CX
 
