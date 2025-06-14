@@ -1,5 +1,6 @@
 ; Prints number to screen in binary
 ; Use carry flag and bit rotation
+; From Norton's Guide to Assembler on PC
 
 ; setup
 ; org 100h
