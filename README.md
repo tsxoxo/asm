@@ -6,6 +6,16 @@ Basically, just me documenting how I approached this in 2025 trying to play with
 
 This information was collected from various sources. Credits go to all the people who shared their knowledge, see [Resources](#resources) section below. Also, thanks Claude.
 
+## Folder Structure
+
+* `c_drive` -- Mounting point for DOSBox.
+* `c_drive/APPS` -- the meat of this repo. Small 16-bit x86 assembly programs written for DOS, ordered by increasing complexity.
+* `c_drive/APPS/VGA_BIOS` -- Programs that draw graphics using BIOS interrupts.
+* `c_drive/APPS/VGA_MEM` -- Programs that draw graphics by writing directly into memory (this is faster than interrupts). 
+* `c_drive/utils` -- batch scripts to help with the compilation cycle.
+
+The `mac_x86-64/` directory contains hello-world programs for x86_64 OSX. If You're here because You wanna do something fun with assembly and graphics, You can safely ignore this. I leave this here on the off-chance this will be useful to somebody. (I briefly tried to write assembly in a more 'modern' way.)
+
 ## Highlights
 
 [6LERP.webm](https://github.com/user-attachments/assets/eb8c31b2-558f-4b3b-a9d7-1aa0021684d0)
