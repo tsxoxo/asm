@@ -1,8 +1,19 @@
-# Stuff that was helpful
+# Getting Started with DOS Assembly on macOS
 
-For writing assembler on an Intel Mac (2017 Macbook Air) using Dosbox-x and FASM.
+A collection of setup tips, workflows and resources. 
 
-These information have been collected from various sources. Credits go to all the people who shared their knowledge, see [Resources](#resources) section below. Also, thanks Claude.
+Basically, just me documenting how I approached this in 2025 trying to play with assembly on an Intel Mac (2017 Macbook Air) using Dosbox-x and FASM.
+
+This information was collected from various sources. Credits go to all the people who shared their knowledge, see [Resources](#resources) section below. Also, thanks Claude.
+
+## Resources
+
+I stitched together the DOSbox config using tips from these sources:
+
+- [ Philip Bohun's Youtube asm guide ](https://www.youtube.com/watch?v=HcLA6F5UTIE&list=PLSiFUSQSRYANu14mkQADmVMYPcssk_IqP&index=1)
+- [ Hans-Joachim Rudolph's guide from the FASM forum ](https://board.flatassembler.net/topic.php?t=22910)
+- [ The official Dosbox-x wiki ](https://dosbox-x.com/wiki/#Home)
+- Other resources I'm almost certainly forgetting
 
 ## Setup Instructions
 
@@ -12,41 +23,30 @@ These information have been collected from various sources. Credits go to all th
 - Create a config file for DosBox: `touch asm/dosbox-x.conf`
 - If You want DPMI, download a server like japheth's [here](https://www.japheth.de/HX.html)
 
-For the last step, copy the contents (or part of them) from the file `dosbox-x.conf` in this repo into your config.
+For the last step, copy all or part of the `dosbox-x.conf` file from this repo into your own config.
 
 ### LSP
 
 - in NeoVim, "asm-lsp" does a decent job for me.
 
-NB: For some reason, this works better in files with CAPITALIZED extension `.ASM`
+NB: For some reason, the LSP works better in files with a capitalized `.ASM` extension.
 
 ### Compile cycle
 
 _Work in progress_
 
-- Edit in Neovim on native OS (outside of dosbox)
-- In `foo.asm`, set up exit on a keyboard input
-- In dosbox, run `watch foo`
-- After making an edit in nvim, switch to dosbox window and press a key
-- watcher tries to recompile `foo.asm` and run `foo.com`
+- Edit `foo.asm` in editor of choise on your host OS (outside of DOSBox)
+- In `foo.asm`, make sure the program exits on a key press
+- In DOSBox, run `watch foo`
+- After making an edit, switch to DOSBox window and press a key
+- `watch` will recompile `foo.asm` and run `foo.com`
 
-This is slightly easier than
+This is slightly easier than manually:
 
-- ... switch to doxbox window
-- hit key to terminate program
-- `fasm foo.asm`
-- `foo.com`
-
-(You could of course run a build script by hand)
-
-# Resources
-
-I stitched together the config based on tips found here:
-
-- [ Philip Bohun's Youtube asm guide ](https://www.youtube.com/watch?v=HcLA6F5UTIE&list=PLSiFUSQSRYANu14mkQADmVMYPcssk_IqP&index=1)
-- [ Hans-Joachim Rudolph's guide from the FASM forum ](https://board.flatassembler.net/topic.php?t=22910)
-- [ The official Dosbox-x wiki ](https://dosbox-x.com/wiki/#Home)
-- Other resources I'm almost certainly forgetting
+- Switching to DOSBox after making an edit
+- Pressing a key to exit the program
+- Running `fasm foo.asm`
+- Running `foo.com`
 
 ## DosBox-X
 
