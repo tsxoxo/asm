@@ -123,12 +123,6 @@ Using the mouse didn't work for me so I set it up via keyboard:
 - Copy selection: `fn + shift + <right>`
 - Cancel: `esc`
 
-## ASM instructions
-
-**mov ax,<value>** - overwrites ax with value of register/constant/memory address
-
-**add <value>** - adds value to ax
-
 ## DOS instructions
 
 - [ List 1, old ](https://www.ctyme.com/intr/int-21.htm)
@@ -140,6 +134,48 @@ Using the mouse didn't work for me so I set it up via keyboard:
 
 **21** - prints char. Set ah to 02h (specifies the function). Set DL to the ASCII code.
 
+### Hammerspoon setup for DOSBox
+
+*Starts/switches focus to DOSBox*
+
+```lua
+-- {hammerspoon path}/init.lua
+
+-- this is my hyper key. can be any modifier you like. 
+local hyper = { "ctrl cmd alt shift" }
+
+hs.hotkey.bind(hyper, ";", function()
+	local dosboxApp = hs.application.get("dosbox-x")
+
+	local function startDos()
+		local task = hs.task.new(
+			"/Applications/MacPorts/Dosbox-x.app/Contents/MacOS/Dosbox-x",
+			nil,
+    -- The trick with this was to pass these parameters.
+    -- Put here the path to your dosbox config.
+			{ "-conf", os.getenv("HOME") .. "/dev/asm/dosbox-x.conf" }
+		)
+		task:start()
+		hs.alert.show("Starting Dosbox...")
+	end
+
+	-- If we found the app, focus it
+	if dosboxApp then
+		local status, err = pcall(function()
+			dosboxApp:activate()
+		end)
+		if not status then
+			print("Error launching dosbox: " .. err)
+			startDos()
+		end
+	else
+		-- Launch it if not found
+		startDos()
+	end
+end)
+```
+
+ 
 ## TODO
 
 - setup cheatsheets: helppc with ralf brown's interrupt list, as suggested [here](https://board.flatassembler.net/topic.php?t=22910)
