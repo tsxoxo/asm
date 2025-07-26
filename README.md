@@ -1,8 +1,8 @@
 # Stuff that was helpful
 
-For writing assembler on an intel Mac (2017 Macbook Air) using Dosbox-x and FASM.
+For writing assembler on an Intel Mac (2017 Macbook Air) using Dosbox-x and FASM.
 
-These information have been compiled/collected from various sources. Credits go to all the people who made the guides listed under `Resources`. Also, thanks Claude.
+These information have been collected from various sources. Credits go to all the people who shared their knowledge, see [Resources](#resources) section below. Also, thanks Claude.
 
 ## Setup Instructions
 
@@ -39,7 +39,7 @@ This is slightly easier than
 
 (You could of course run a build script by hand)
 
-## Resources
+# Resources
 
 I stitched together the config based on tips found here:
 
@@ -61,6 +61,7 @@ I stitched together the config based on tips found here:
 _Keys for editing, debugging, compiling, etc._
 
 ### DEBUG
+(The 'DEBUG' program that comes with dosbox-x)
 
 - **t** - [t]race (step execution)
 - **g** - [g]o! Run program
@@ -103,6 +104,7 @@ Using the mouse didn't work for me so I set it up via keyboard:
 ## ASM instructions
 
 **mov ax,<value>** - overwrites ax with value of register/constant/memory address
+
 **add <value>** - adds value to ax
 
 ## DOS instructions
@@ -113,29 +115,9 @@ Using the mouse didn't work for me so I set it up via keyboard:
 ### Interrupts
 
 **20** - exit
+
 **21** - prints char. Set ah to 02h (specifies the function). Set DL to the ASCII code.
-
-## ASCII art
-
-### Chars
-
-_ascii hex codes_
-
-**☻** - 02
-
-This is the BIOS Data Area (BDA) - a goldmine for ASCII art programming! It contains:
-
-- 0040:0004-0005: Initial video mode (80×25 text indicated by values)
-- 0040:0049: Current video mode (should be 3 for color text)
-- 0040:004A-004B: Number of screen columns (80, or 50h)
-- 0040:0050-0051: Cursor position for each page
-- 0040:0060: Cursor shape information
-- 0040:0063: Active display page
 
 ## TODO
 
-### Workflow
-
-- setup a 2-pane or 2-window: one for code one for execution:use volkov, norton commander or dos navigator
-- use a watch script
 - setup cheatsheets: helppc with ralf brown's interrupt list, as suggested [here](https://board.flatassembler.net/topic.php?t=22910)
