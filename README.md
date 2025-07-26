@@ -6,6 +6,18 @@ Basically, just me documenting how I approached this in 2025 trying to play with
 
 This information was collected from various sources. Credits go to all the people who shared their knowledge, see [Resources](#resources) section below. Also, thanks Claude.
 
+## Highlights
+
+[6LERP.webm](https://github.com/user-attachments/assets/eb8c31b2-558f-4b3b-a9d7-1aa0021684d0)
+
+*A very big (over 1KB), very naively implemented starfield-inspired demo. `/APPS/VGA_MEM/6LERP`*
+
+---
+
+[6SZ_LERP.webm](https://github.com/user-attachments/assets/8962cd1d-90df-46f6-8596-dbc01ab2ad6c)
+
+*An attempt to cut the above demo down to size. Result: ~350kb. `/APPS/VGA_MEM/6SZ_LERP`* 
+
 ## Resources
 
 I stitched together the DOSbox config using tips from these sources:
