@@ -1,4 +1,4 @@
-# Getting Started with DOS Assembly on macOS
+# Getting Started with DOS Assembly on a x86_64 Mac
 
 A collection of setup tips, workflows and resources. 
 
